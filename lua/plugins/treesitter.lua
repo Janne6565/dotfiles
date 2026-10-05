@@ -5,7 +5,21 @@ vim.pack.add { { src = gh 'nvim-treesitter/nvim-treesitter', version = 'main' } 
 
 local ts = require 'nvim-treesitter'
 
-ts.install {
+-- Without the CLI every parser build fails, so skip installing and say how to fix it once.
+-- Neovim's bundled parsers (c, lua, markdown, query, vim, vimdoc) keep working regardless.
+local can_build = vim.fn.executable 'tree-sitter' == 1
+if not can_build then
+  vim.schedule(
+    function()
+      vim.notify(
+        'tree-sitter CLI not found: skipping parser installs.\nInstall tree-sitter-cli 0.26.1+ with your package manager (not npm), then restart Neovim.',
+        vim.log.levels.WARN
+      )
+    end
+  )
+end
+
+local parsers = {
   'bash',
   'css',
   'diff',
@@ -35,6 +49,7 @@ ts.install {
   'xml', -- pom.xml
   'yaml',
 }
+if can_build then ts.install(parsers) end
 
 local function attach(buf, lang)
   if not vim.api.nvim_buf_is_valid(buf) or not vim.treesitter.language.add(lang) then return end
@@ -48,7 +63,7 @@ vim.api.nvim_create_autocmd('FileType', {
   callback = function(ev)
     local lang = vim.treesitter.language.get_lang(ev.match)
     if not lang then return end
-    if vim.tbl_contains(ts.get_installed 'parsers', lang) or not vim.tbl_contains(available, lang) then
+    if not can_build or vim.tbl_contains(ts.get_installed 'parsers', lang) or not vim.tbl_contains(available, lang) then
       attach(ev.buf, lang)
     else
       ts.install(lang):await(function() attach(ev.buf, lang) end)
