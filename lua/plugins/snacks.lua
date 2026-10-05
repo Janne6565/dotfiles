@@ -5,6 +5,22 @@ vim.pack.add { gh 'folke/snacks.nvim' }
 
 local Snacks = require 'snacks'
 
+-- Directories hidden from file search and grep, even when they are not in .gitignore.
+-- Matched by name at any depth inside the current project. The explorer (<leader>e) still shows them.
+local excluded_dirs = { 'build', 'target', 'out', 'dist', 'node_modules', '.gradle' }
+
+---Picker filter: false for files inside one of `excluded_dirs` in the current project
+---@param item snacks.picker.finder.Item
+local function outside_excluded_dirs(item)
+  -- Runs in a fast (async) context, so only vim.uv/vim.fs calls, no vim.fn
+  local rel = item.file and vim.fs.relpath(vim.uv.cwd(), vim.fs.abspath(item.file))
+  if not rel then return true end -- files outside the project are never filtered
+  for part in vim.gsplit(rel, '/', { plain = true }) do
+    if vim.list_contains(excluded_dirs, part) then return false end
+  end
+  return true
+end
+
 Snacks.setup {
   bigfile = { enabled = true }, -- disable heavy features on huge files
   quickfile = { enabled = true }, -- render the file before plugins finish loading
@@ -42,8 +58,9 @@ Snacks.setup {
     enabled = true,
     ui_select = true, -- use the picker for vim.ui.select (code actions etc.)
     sources = {
-      files = { hidden = true },
-      grep = { hidden = true },
+      files = { hidden = true, exclude = excluded_dirs },
+      grep = { hidden = true, exclude = excluded_dirs },
+      recent = { filter = { filter = outside_excluded_dirs } },
       explorer = { hidden = true },
     },
   },

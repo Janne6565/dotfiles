@@ -104,6 +104,10 @@ To add a plugin, call `vim.pack.add { gh 'owner/repo' }` in a file under `lua/pl
 
 Extra JDKs (for example Java 17 and 21 side by side) can be registered under `runtimes` in `lua/plugins/java.lua`.
 
+## Hidden directories
+
+File search, grep and recent files skip `build`, `target`, `out`, `dist`, `node_modules` and `.gradle` inside your project, even if they aren't in `.gitignore`. Anything in `.gitignore` is skipped too. Edit `excluded_dirs` at the top of `lua/plugins/snacks.lua` to change the list. The explorer (`<leader>e`) still shows everything.
+
 ## Maintenance
 
 - `:lua vim.pack.update()` (`<leader>pu`) fetches updates and opens a review buffer. `:write` applies them, `:quit` cancels. Then commit `nvim-pack-lock.json`.
