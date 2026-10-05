@@ -23,7 +23,7 @@ It started from [kickstart.nvim](https://github.com/nvim-lua/kickstart.nvim).
 
 - **Neovim 0.12+**
 - `git`, `curl`, `tar`, `unzip`, `make`, a C compiler
-- [`tree-sitter` CLI](https://github.com/tree-sitter/tree-sitter/blob/master/crates/cli/README.md) 0.26+ (nvim-treesitter compiles parsers with it)
+- [`tree-sitter` CLI](https://github.com/tree-sitter/tree-sitter/blob/master/crates/cli/README.md) 0.26.1+, installed with your package manager, not npm (nvim-treesitter compiles parsers with it, see below)
 - [`ripgrep`](https://github.com/BurntSushi/ripgrep) and [`fd`](https://github.com/sharkdp/fd) for the picker
 - A [Nerd Font](https://www.nerdfonts.com) set as your terminal font (otherwise set `vim.g.have_nerd_font = false` in `init.lua`)
 - Java: a **JDK 21+** (to run jdtls; projects can target older versions) and `python3`
@@ -38,6 +38,19 @@ nvim
 ```
 
 On first start Neovim asks you to confirm installing the plugins. Mason then installs the language servers, formatters and Java tooling in the background (`:Mason` shows progress). Treesitter parsers are compiled the first time too. Restart once everything is done.
+
+### Installing the tree-sitter CLI
+
+| System | Command |
+| --- | --- |
+| macOS | `brew install tree-sitter-cli` |
+| Arch | `sudo pacman -S tree-sitter-cli` |
+| Fedora | `sudo dnf install tree-sitter-cli` |
+| Any (with Rust) | `cargo install --locked tree-sitter-cli` |
+| Any | download the binary for your platform from the [tree-sitter releases](https://github.com/tree-sitter/tree-sitter/releases) and put it on your `PATH` |
+
+Debian/Ubuntu packages are usually too old; use cargo or the release binary there. Check with `tree-sitter --version`.
+Without the CLI, Neovim still starts and shows one warning, but only its bundled parsers (Lua, Vimscript, Markdown, C) highlight.
 
 ## Layout
 
