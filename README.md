@@ -83,6 +83,7 @@ To add a plugin, call `vim.pack.add { gh 'owner/repo' }` in a file under `lua/pl
 | `s` / `S` | Flash jump / treesitter select |
 | `gsa` / `gsd` / `gsr` | Add / delete / replace surrounding |
 | `gd`, `grr`, `gri`, `grt`, `K` | Definition, references, implementation, type definition, hover |
+| | While a lookup takes longer than a moment, a spinner shows; it gives up after 30s, and says so if the server is still loading the project |
 | `<leader>ca` / `<leader>cr` / `<leader>cf` | Code action / rename / format |
 | `<leader>xx` | Diagnostics list (Trouble) |
 | `]h` / `[h`, `<leader>h…` | Next / previous git hunk, hunk actions |

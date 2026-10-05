@@ -70,6 +70,65 @@ for name, config in pairs(servers) do
   vim.lsp.enable(name)
 end
 
+---Wrap an LSP picker so a spinner notification shows while the server is still looking.
+---The Snacks picker shows no UI until results arrive (it jumps directly for a single result),
+---so slow servers like jdtls on a large project would otherwise give no feedback at all.
+local lookup = { timer = nil, timeout_s = 30 }
+
+local function stop_lookup(notified)
+  if lookup.timer and not lookup.timer:is_closing() then lookup.timer:close() end
+  lookup.timer = nil
+  if notified then Snacks.notifier.hide 'lsp_lookup' end
+end
+
+---@param label string e.g. 'Finding definition'
+---@param method string LSP method, used to check that a server can answer at all
+---@param open fun(): snacks.Picker?
+local function with_spinner(label, method, open)
+  return function()
+    -- jdtls only announces most capabilities once the project import is under way
+    if #vim.lsp.get_clients { bufnr = 0, method = method } == 0 then
+      local names = vim.tbl_map(function(c) return c.name end, vim.lsp.get_clients { bufnr = 0 })
+      Snacks.notify.warn(
+        #names > 0 and ('%s is still loading the project, try again in a moment'):format(table.concat(names, ', '))
+          or 'No language server attached to this buffer',
+        { title = 'LSP' }
+      )
+      return
+    end
+    if lookup.timer then stop_lookup(true) end -- a previous lookup that is still running
+    local picker = open()
+    if not picker then return end
+    local start, notified = vim.uv.hrtime(), false
+    lookup.timer = assert(vim.uv.new_timer())
+    -- Only show after 150ms so fast lookups don't flash a notification
+    lookup.timer:start(
+      150,
+      100,
+      vim.schedule_wrap(function()
+        if picker.closed or picker.shown then return stop_lookup(notified) end
+        local elapsed = (vim.uv.hrtime() - start) / 1e9
+        if elapsed > lookup.timeout_s then
+          stop_lookup(notified)
+          picker:close()
+          return Snacks.notify.warn(
+            ('No answer after %ds. The language server may still be indexing, see the progress in the corner.'):format(lookup.timeout_s),
+            { title = 'LSP' }
+          )
+        end
+        notified = true
+        Snacks.notify(('%s… %ds'):format(label, elapsed), {
+          id = 'lsp_lookup',
+          title = 'LSP',
+          icon = Snacks.util.spinner(),
+          timeout = false,
+          history = false,
+        })
+      end)
+    )
+  end
+end
+
 -- Keymaps, set when a server attaches to a buffer.
 -- Neovim already provides: K hover, grn rename, gra code action, grr references,
 -- gri implementation, grt type definition, gO document symbols.
@@ -79,11 +138,11 @@ vim.api.nvim_create_autocmd('LspAttach', {
     local function map(keys, fn, desc, mode) vim.keymap.set(mode or 'n', keys, fn, { buffer = ev.buf, desc = 'LSP: ' .. desc }) end
     local P = Snacks.picker
 
-    map('gd', P.lsp_definitions, 'Goto definition')
-    map('gD', P.lsp_declarations, 'Goto declaration')
-    map('grr', P.lsp_references, 'References')
-    map('gri', P.lsp_implementations, 'Goto implementation')
-    map('grt', P.lsp_type_definitions, 'Goto type definition')
+    map('gd', with_spinner('Finding definition', 'textDocument/definition', P.lsp_definitions), 'Goto definition')
+    map('gD', with_spinner('Finding declaration', 'textDocument/declaration', P.lsp_declarations), 'Goto declaration')
+    map('grr', with_spinner('Finding references', 'textDocument/references', P.lsp_references), 'References')
+    map('gri', with_spinner('Finding implementations', 'textDocument/implementation', P.lsp_implementations), 'Goto implementation')
+    map('grt', with_spinner('Finding type definition', 'textDocument/typeDefinition', P.lsp_type_definitions), 'Goto type definition')
     map('gO', P.lsp_symbols, 'Document symbols')
     map('<leader>ca', vim.lsp.buf.code_action, 'Code action', { 'n', 'x' })
     map('<leader>cr', vim.lsp.buf.rename, 'Rename symbol')
