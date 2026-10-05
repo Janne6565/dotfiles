@@ -20,7 +20,14 @@ local function bundles()
   return jars
 end
 
-local root_markers = { 'mvnw', 'gradlew', 'settings.gradle', 'settings.gradle.kts', 'pom.xml', 'build.gradle', 'build.gradle.kts', '.git' }
+-- Groups are tried in order, each one all the way up the tree. This makes multi-module projects use
+-- their top-level directory: a module's own pom.xml/build.gradle must not win, or jdtls only imports
+-- that module and `gd` into sibling modules finds nothing.
+local root_markers = {
+  { 'mvnw', 'gradlew', 'settings.gradle', 'settings.gradle.kts' }, -- build root
+  { '.git' }, -- repository root
+  { 'pom.xml', 'build.gradle', 'build.gradle.kts' }, -- single project without wrapper or git
+}
 
 local function start_jdtls()
   local jdtls = require 'jdtls'
