@@ -78,6 +78,7 @@ To add a plugin, call `vim.pack.add { gh 'owner/repo' }` in a file under `lua/pl
 | `<leader>e` | File explorer |
 | `<C-/>` or `<leader>tt` | Toggle floating terminal (`<leader>tb` for a bottom split) |
 | `<leader>gg` | Lazygit |
+| `<leader>w` + `h/j/k/l` or `<C-h/j/k/l>` | Move between windows (`<leader>w` works like `<C-w>`: `s`/`v` split, `q` close, `=` equalize) |
 | `<S-h>` / `<S-l>`, `<leader>bd` | Previous / next buffer, delete buffer |
 | `s` / `S` | Flash jump / treesitter select |
 | `gsa` / `gsd` / `gsr` | Add / delete / replace surrounding |

@@ -22,7 +22,7 @@ require('which-key').setup {
     { '<leader>s', group = 'search', mode = { 'n', 'x' } },
     { '<leader>t', group = 'toggle/terminal' },
     { '<leader>u', group = 'ui' },
-    { '<leader>w', group = 'window' },
+    { '<leader>w', group = 'window', proxy = '<C-w>' }, -- <leader>w works like <C-w> (hjkl, s, v, q, =, ...)
     { 'gs', group = 'surround', mode = { 'n', 'x' } },
     { '<leader>x', group = 'diagnostics/quickfix' },
     { 'gr', group = 'LSP' },
