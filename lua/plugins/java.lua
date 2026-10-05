@@ -79,6 +79,10 @@ local function start_jdtls()
 
   jdtls.start_or_attach {
     cmd = cmd,
+    -- jdtls (Eclipse) picks up http(s)_proxy from the environment but only reads lowercase `no_proxy`.
+    -- With only NO_PROXY set, internal hosts (e.g. a company Artifactory) get sent through the proxy
+    -- and the Gradle/Maven import fails, so pass the exceptions on under the name Eclipse reads.
+    cmd_env = { no_proxy = vim.env.no_proxy or vim.env.NO_PROXY },
     root_dir = root_dir,
     capabilities = require('blink.cmp').get_lsp_capabilities(),
     init_options = { bundles = bundles() },
