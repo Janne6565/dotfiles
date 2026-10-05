@@ -194,6 +194,21 @@ vim.api.nvim_create_user_command('JavaReport', function()
   for _, n in ipairs(ok and hist or {}) do
     add(n.msg)
   end
+  add '--- errors in :messages:'
+  for _, l in ipairs(vim.split(vim.api.nvim_exec2('messages', { output = true }).output, '\n')) do
+    if l:match '^E%d+' or l:match 'rror' and not l:match 'nvim%-treesitter' then add(l) end
+  end
+  add '--- running jdtls processes (another Neovim on the same project locks its workspace):'
+  add(vim.trim(vim.fn.system [[ps -eo pid,etime,args | grep '[o]rg.eclipse.equinox.launcher' | sed 's/ -.*-data / ... -data /' | cut -c1-200]]))
+  add('--- jdtls lines in the LSP log (' .. vim.lsp.log.get_filename() .. '):')
+  local lsp_log = vim.fn.filereadable(vim.lsp.log.get_filename()) == 1 and vim.fn.readfile(vim.lsp.log.get_filename()) or {}
+  local jdtls_lines = vim.tbl_filter(
+    function(l) return l:match 'jdtls' and not l:match 'JAVA_TOOL_OPTIONS' and not l:match 'incubator' and not l:match 'spifly' end,
+    vim.list_slice(lsp_log, math.max(1, #lsp_log - 400))
+  )
+  for i = math.max(1, #jdtls_lines - 15), #jdtls_lines do
+    add((jdtls_lines[i] or ''):sub(1, 300))
+  end
   vim.cmd 'new'
   vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
   vim.bo.buftype, vim.bo.bufhidden = 'nofile', 'wipe'
