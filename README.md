@@ -101,6 +101,8 @@ To add a plugin, call `vim.pack.add { gh 'owner/repo' }` in a file under `lua/pl
 | `<leader>jp` | Jump between test and implementation |
 | `<leader>ju` | Reload project config after editing `pom.xml` / `build.gradle` |
 | `<F5>` | Debug: pick a `main` class to launch |
+| `<leader>jR` / `:JavaReport` | Troubleshooting report: project root, import errors, diagnostics |
+| `<leader>jw` | Wipe jdtls workspace data and restart (fixes a stale or broken import) |
 
 Extra JDKs (for example Java 17 and 21 side by side) can be registered under `runtimes` in `lua/plugins/java.lua`.
 

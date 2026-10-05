@@ -14,8 +14,9 @@ local function bundles()
   local jars = vim.fn.glob(mason_path 'java-debug-adapter/extension/server/com.microsoft.java.debug.plugin-*.jar', true, true)
   for _, jar in ipairs(vim.fn.glob(mason_path 'java-test/extension/server/*.jar', true, true)) do
     local name = vim.fs.basename(jar)
-    -- These two jars are not OSGi bundles and break jdtls when loaded
-    if name ~= 'com.microsoft.java.test.runner-jar-with-dependencies.jar' and name ~= 'jacocoagent.jar' then table.insert(jars, jar) end
+    -- The runner and jacoco jars are not OSGi bundles, and jdtls already ships its own asm bundles
+    local skip = name == 'com.microsoft.java.test.runner-jar-with-dependencies.jar' or name == 'jacocoagent.jar' or name:match '^org%.objectweb%.asm'
+    if not skip then table.insert(jars, jar) end
   end
   return jars
 end
@@ -107,5 +108,53 @@ vim.api.nvim_create_autocmd('FileType', {
     map('n', '<leader>ju', '<cmd>JdtUpdateConfig<CR>', 'Reload project config (pom/gradle)')
     map('n', '<leader>jb', '<cmd>JdtCompile full<CR>', 'Full build')
     map('n', '<leader>jw', '<cmd>JdtWipeDataAndRestart<CR>', 'Wipe workspace data and restart')
+    map('n', '<leader>jR', '<cmd>JavaReport<CR>', 'jdtls report (troubleshooting)')
   end,
 })
+
+-- :JavaReport opens a scratch buffer with jdtls' project root, workspace, log errors and diagnostics.
+-- Use it when goto-definition/completion stop working to see whether the project import failed.
+vim.api.nvim_create_user_command('JavaReport', function()
+  local lines = {}
+  local function add(s) vim.list_extend(lines, vim.split(s, '\n')) end
+  local c = vim.lsp.get_clients({ bufnr = 0, name = 'jdtls' })[1]
+  add('file: ' .. vim.api.nvim_buf_get_name(0))
+  add('jdtls attached: ' .. tostring(c ~= nil))
+  if c then
+    add('root_dir: ' .. tostring(c.root_dir))
+    local data = c.config.cmd[vim.fn.index(c.config.cmd, '-data') + 2]
+    add('workspace: ' .. tostring(data))
+    add(
+      'build files in root: '
+        .. table.concat(
+          vim.fn.globpath(c.root_dir, '{pom.xml,build.gradle,build.gradle.kts,settings.gradle,settings.gradle.kts,mvnw,gradlew}', false, true),
+          ', '
+        )
+    )
+    local props = c.root_dir .. '/gradle/wrapper/gradle-wrapper.properties'
+    if vim.uv.fs_stat(props) then add('gradle wrapper: ' .. (vim.fn.readfile(props)[vim.fn.match(vim.fn.readfile(props), 'distributionUrl') + 1] or '?')) end
+    local log = data and (data .. '/.metadata/.log')
+    if log and vim.uv.fs_stat(log) then
+      local all = vim.fn.readfile(log)
+      local errs = vim.tbl_filter(function(l) return l:match '^!MESSAGE' or l:match 'Exception' or l:match 'rror' end, all)
+      add('--- last errors in jdtls log (' .. log .. '):')
+      for i = math.max(1, #errs - 25), #errs do
+        add(errs[i] or '')
+      end
+    end
+  end
+  add('java on PATH: ' .. vim.trim(vim.fn.system 'java -version 2>&1 | head -1'))
+  add('JAVA_HOME: ' .. tostring(vim.env.JAVA_HOME))
+  add '--- diagnostics in this buffer:'
+  for _, d in ipairs(vim.diagnostic.get(0)) do
+    add(('%d: %s'):format(d.lnum + 1, d.message))
+  end
+  add '--- recent notifications:'
+  local ok, hist = pcall(function() return Snacks.notifier.get_history() end)
+  for _, n in ipairs(ok and hist or {}) do
+    add(n.msg)
+  end
+  vim.cmd 'new'
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+  vim.bo.buftype, vim.bo.bufhidden = 'nofile', 'wipe'
+end, { desc = 'Show jdtls diagnostics report' })
