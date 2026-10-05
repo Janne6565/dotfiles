@@ -104,7 +104,7 @@ To add a plugin, call `vim.pack.add { gh 'owner/repo' }` in a file under `lua/pl
 | `<leader>jR` / `:JavaReport` | Troubleshooting report: project root, import errors, diagnostics |
 | `<leader>jw` | Wipe jdtls workspace data and restart (fixes a stale or broken import) |
 
-Extra JDKs (for example Java 17 and 21 side by side) can be registered under `runtimes` in `lua/plugins/java.lua`.
+Installed JDKs (SDKMAN, `/usr/lib/jvm`, macOS) are detected automatically, so projects compile against the Java version they declare. The Gradle import runs on JDK 21 (or 17) when one is installed, because Gradle 8.x can't run on Java 25. Set `JDTLS_GRADLE_JAVA_HOME` to choose a different JDK for Gradle.
 
 ## Hidden directories
 

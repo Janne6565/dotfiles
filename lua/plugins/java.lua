@@ -2,7 +2,7 @@
 --
 -- Requirements: a JDK 21+ on PATH (or JAVA_HOME) to run jdtls, and python3 for Mason's jdtls launcher.
 -- Mason installs jdtls, java-debug-adapter and java-test (see lsp.lua). Your projects can target
--- any Java version; register extra JDKs below under `runtimes` if you need to switch between them.
+-- any Java version: installed JDKs (SDKMAN, /usr/lib/jvm, macOS) are detected and registered automatically.
 --
 -- Supports Maven, Gradle and plain projects, Lombok, debugging (<F5>) and running JUnit tests.
 vim.pack.add { gh 'mfussenegger/nvim-jdtls' }
@@ -24,6 +24,43 @@ end
 -- Groups are tried in order, each one all the way up the tree. This makes multi-module projects use
 -- their top-level directory: a module's own pom.xml/build.gradle must not win, or jdtls only imports
 -- that module and `gd` into sibling modules finds nothing.
+-- Installed JDKs by major version, read from each JDK's `release` file
+---@return table<integer, string>
+local function find_jdks()
+  local jdks = {}
+  local patterns = {
+    '~/.sdkman/candidates/java/*',
+    '/usr/lib/jvm/*',
+    '/Library/Java/JavaVirtualMachines/*/Contents/Home',
+    '~/Library/Java/JavaVirtualMachines/*/Contents/Home',
+  }
+  for _, pattern in ipairs(patterns) do
+    for _, dir in ipairs(vim.fn.glob(pattern, true, true)) do
+      local release = vim.fs.joinpath(dir, 'release')
+      if vim.uv.fs_stat(release) then
+        local version = table.concat(vim.fn.readfile(release), '\n'):match 'JAVA_VERSION="([%d.]+)'
+        local major = version and tonumber(version:match '^1%.(%d+)' or version:match '^(%d+)')
+        local path = vim.uv.fs_realpath(dir)
+        if major and path and not jdks[major] then jdks[major] = path end
+      end
+    end
+  end
+  return jdks
+end
+
+local jdks = find_jdks()
+
+-- jdtls runs the Gradle import on its own JVM by default. Old Gradle versions cannot run on new Java
+-- (Gradle 8.x does not support Java 25), the import fails and every file becomes a "non-project file".
+-- Prefer an LTS JDK that Gradle 8 supports. Override with the JDTLS_GRADLE_JAVA_HOME environment variable.
+local gradle_java_home = vim.env.JDTLS_GRADLE_JAVA_HOME or jdks[21] or jdks[17]
+
+local runtimes = {}
+for major, path in pairs(jdks) do
+  table.insert(runtimes, { name = major <= 8 and ('JavaSE-1.' .. major) or ('JavaSE-' .. major), path = path })
+end
+table.sort(runtimes, function(a, b) return a.path < b.path end)
+
 local root_markers = {
   { 'mvnw', 'gradlew', 'settings.gradle', 'settings.gradle.kts' }, -- build root
   { '.git' }, -- repository root
@@ -53,12 +90,9 @@ local function start_jdtls()
         maven = { downloadSources = true },
         configuration = {
           updateBuildConfiguration = 'interactive',
-          -- Register additional JDKs here, e.g.:
-          -- runtimes = {
-          --   { name = 'JavaSE-17', path = '/usr/lib/jvm/java-17-openjdk' },
-          --   { name = 'JavaSE-21', path = '/usr/lib/jvm/java-21-openjdk', default = true },
-          -- },
+          runtimes = runtimes, -- JDKs a project can compile against (matched to its sourceCompatibility/toolchain)
         },
+        import = { gradle = { java = { home = gradle_java_home } } },
         implementationsCodeLens = { enabled = true },
         referencesCodeLens = { enabled = true },
         inlayHints = { parameterNames = { enabled = 'literals' } },
@@ -144,6 +178,8 @@ vim.api.nvim_create_user_command('JavaReport', function()
     end
   end
   add('java on PATH: ' .. vim.trim(vim.fn.system 'java -version 2>&1 | head -1'))
+  add('detected JDKs: ' .. table.concat(vim.tbl_map(function(r) return r.name .. '=' .. r.path end, runtimes), ', '))
+  add('JDK used for Gradle import: ' .. tostring(gradle_java_home or 'none found, jdtls JVM (java on PATH)'))
   add('JAVA_HOME: ' .. tostring(vim.env.JAVA_HOME))
   add '--- diagnostics in this buffer:'
   for _, d in ipairs(vim.diagnostic.get(0)) do
